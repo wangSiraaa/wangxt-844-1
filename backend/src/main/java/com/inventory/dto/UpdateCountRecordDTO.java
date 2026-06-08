@@ -10,4 +10,20 @@ public class UpdateCountRecordDTO {
 
     @NotNull(message = "盘点数量不能为空")
     private Integer countedQuantity;
+
+    public Long getRecordId() {
+        return recordId;
+    }
+
+    public void setRecordId(Long recordId) {
+        this.recordId = recordId;
+    }
+
+    public Integer getCountedQuantity() {
+        return countedQuantity;
+    }
+
+    public void setCountedQuantity(Integer countedQuantity) {
+        this.countedQuantity = countedQuantity;
+    }
 }

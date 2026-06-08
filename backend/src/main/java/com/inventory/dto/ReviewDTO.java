@@ -17,4 +17,36 @@ public class ReviewDTO {
     private ReviewResult reviewResult;
 
     private String reviewComment;
+
+    public Long getTaskId() {
+        return taskId;
+    }
+
+    public void setTaskId(Long taskId) {
+        this.taskId = taskId;
+    }
+
+    public String getReviewer() {
+        return reviewer;
+    }
+
+    public void setReviewer(String reviewer) {
+        this.reviewer = reviewer;
+    }
+
+    public ReviewResult getReviewResult() {
+        return reviewResult;
+    }
+
+    public void setReviewResult(ReviewResult reviewResult) {
+        this.reviewResult = reviewResult;
+    }
+
+    public String getReviewComment() {
+        return reviewComment;
+    }
+
+    public void setReviewComment(String reviewComment) {
+        this.reviewComment = reviewComment;
+    }
 }

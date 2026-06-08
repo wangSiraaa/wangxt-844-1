@@ -55,4 +55,100 @@ public class CountTask {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "store_id", insertable = false, updatable = false)
     private Store store;
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public Long getStoreId() {
+        return storeId;
+    }
+
+    public void setStoreId(Long storeId) {
+        this.storeId = storeId;
+    }
+
+    public String getTaskNo() {
+        return taskNo;
+    }
+
+    public void setTaskNo(String taskNo) {
+        this.taskNo = taskNo;
+    }
+
+    public TaskStatus getTaskStatus() {
+        return taskStatus;
+    }
+
+    public void setTaskStatus(TaskStatus taskStatus) {
+        this.taskStatus = taskStatus;
+    }
+
+    public BigDecimal getTotalDiffAmount() {
+        return totalDiffAmount;
+    }
+
+    public void setTotalDiffAmount(BigDecimal totalDiffAmount) {
+        this.totalDiffAmount = totalDiffAmount;
+    }
+
+    public LocalDateTime getSubmitTime() {
+        return submitTime;
+    }
+
+    public void setSubmitTime(LocalDateTime submitTime) {
+        this.submitTime = submitTime;
+    }
+
+    public LocalDateTime getCloseTime() {
+        return closeTime;
+    }
+
+    public void setCloseTime(LocalDateTime closeTime) {
+        this.closeTime = closeTime;
+    }
+
+    public String getCreatedBy() {
+        return createdBy;
+    }
+
+    public void setCreatedBy(String createdBy) {
+        this.createdBy = createdBy;
+    }
+
+    public String getRemark() {
+        return remark;
+    }
+
+    public void setRemark(String remark) {
+        this.remark = remark;
+    }
+
+    public LocalDateTime getCreatedTime() {
+        return createdTime;
+    }
+
+    public void setCreatedTime(LocalDateTime createdTime) {
+        this.createdTime = createdTime;
+    }
+
+    public LocalDateTime getUpdatedTime() {
+        return updatedTime;
+    }
+
+    public void setUpdatedTime(LocalDateTime updatedTime) {
+        this.updatedTime = updatedTime;
+    }
+
+    public Store getStore() {
+        return store;
+    }
+
+    public void setStore(Store store) {
+        this.store = store;
+    }
 }

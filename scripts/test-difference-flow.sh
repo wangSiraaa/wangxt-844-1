@@ -121,11 +121,36 @@ while IFS='|' read -r rec_id prod_id sys_qty price; do
 done <<< "$records"
 echo ""
 
-echo -e "${YELLOW}步骤 6: 录入高金额差异（笔记本电脑少2台，差异=2×¥5999=¥11998）${NC}"
+echo -e "${YELLOW}步骤 6: 录入高金额差异（差异金额超过阈值¥5000）${NC}"
 echo "------------------------------------------"
-# 西城店笔记本电脑系统库存是6台，我们录入4台，差异为-2台
-laptop_system_qty=6
-laptop_counted_qty=4
+# 从任务详情中动态获取实际系统库存数量，并设置盘点数量使差异超过阈值
+# 笔记本电脑: 单价¥5999，少2台即差异¥11998
+# 智能手机: 单价¥3999，少2台即差异¥7998
+
+laptop_system_qty=$(echo "$detail_response" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+records = data['data']['records']
+for r in records:
+    if r['productId'] == 9:
+        print(r['systemQuantity'])
+        break
+" 2>/dev/null)
+
+phone_system_qty=$(echo "$detail_response" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+records = data['data']['records']
+for r in records:
+    if r['productId'] == 10:
+        print(r['systemQuantity'])
+        break
+" 2>/dev/null)
+
+# 确保盘点数量比系统库存少，产生足够大的差异
+laptop_counted_qty=$((laptop_system_qty - 2))
+phone_counted_qty=$((phone_system_qty - 2))
+
 laptop_diff=$((laptop_counted_qty - laptop_system_qty))
 laptop_diff_amount=$((laptop_diff * 5999))
 echo "  笔记本电脑: 系统=$laptop_system_qty台, 盘点=$laptop_counted_qty台, 差异=$laptop_diff台, 差异金额=¥$laptop_diff_amount"
@@ -135,17 +160,15 @@ update1_response=$(curl -s -X PUT "$BASE_URL/count-tasks/records" \
     -d "{\"recordId\": $laptop_record_id, \"countedQuantity\": $laptop_counted_qty}")
 check_response "$update1_response" "200" "更新笔记本电脑盘点数量"
 
-# 智能手机也设置一些差异，确保总差异远超阈值
-phone_system_qty=10
-phone_counted_qty=7
 phone_diff=$((phone_counted_qty - phone_system_qty))
 phone_diff_amount=$((phone_diff * 3999))
 echo "  智能手机: 系统=$phone_system_qty台, 盘点=$phone_counted_qty台, 差异=$phone_diff台, 差异金额=¥$phone_diff_amount"
 
 total_diff=$((laptop_diff_amount + phone_diff_amount))
-echo "  预计总差异金额: ¥$total_diff"
+total_diff_abs=$((total_diff < 0 ? -total_diff : total_diff))
+echo "  预计总差异金额(绝对值): ¥$total_diff_abs"
 echo "  门店阈值: ¥5000"
-echo -e "  ${YELLOW}差异金额 ¥$total_diff > 阈值 ¥5000，提交后应进入 REVIEWING 状态${NC}"
+echo -e "  ${YELLOW}差异金额 ¥$total_diff_abs > 阈值 ¥5000，提交后应进入 REVIEWING 状态${NC}"
 
 update2_response=$(curl -s -X PUT "$BASE_URL/count-tasks/records" \
     -H "Content-Type: application/json" \
