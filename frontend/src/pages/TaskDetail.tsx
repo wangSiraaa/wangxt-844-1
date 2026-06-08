@@ -17,9 +17,9 @@ import {
   Descriptions,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { ArrowLeftOutlined, CheckOutlined, AuditOutlined, CloseOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, CheckOutlined, AuditOutlined, CloseOutlined, ExclamationCircleOutlined, ImportOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
 import { countTaskApi, storeApi, productApi } from '../api';
-import type { CountTask, CountRecord, Product, Store, ReviewResult } from '../types';
+import type { CountTask, CountRecord, Product, Store, ReviewResult, InventoryWithProductVO } from '../types';
 import { getStatusText, getStatusColor } from '../utils/status';
 import dayjs from 'dayjs';
 
@@ -41,6 +41,11 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ isCreate }) => {
   const [editValue, setEditValue] = useState<number>(0);
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
   const [reviewForm] = Form.useForm();
+  const [batchImportVisible, setBatchImportVisible] = useState(false);
+  const [batchImportData, setBatchImportData] = useState<InventoryWithProductVO[]>([]);
+  const [batchImportLoading, setBatchImportLoading] = useState(false);
+  const [batchFilterForm] = Form.useForm();
+  const [batchEditData, setBatchEditData] = useState<Map<number, number>>(new Map());
 
   useEffect(() => {
     loadStores();
@@ -207,6 +212,74 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ isCreate }) => {
         }
       },
     });
+  };
+
+  const handleBatchImport = () => {
+    if (!canEdit) {
+      message.error('当前任务状态不允许批量导入');
+      return;
+    }
+    setBatchImportVisible(true);
+    setBatchEditData(new Map());
+    loadBatchImportData();
+  };
+
+  const loadBatchImportData = async (category?: string, keyword?: string) => {
+    if (!task) return;
+    setBatchImportLoading(true);
+    try {
+      const data = await countTaskApi.getBatchImportData(task.id, { category, keyword });
+      setBatchImportData(data);
+    } catch (e: any) {
+      message.error(e.message);
+    } finally {
+      setBatchImportLoading(false);
+    }
+  };
+
+  const handleBatchFilter = async () => {
+    const values = await batchFilterForm.validateFields();
+    loadBatchImportData(values.category, values.keyword);
+  };
+
+  const handleBatchQuantityChange = (recordId: number, value: number) => {
+    setBatchEditData((prev) => {
+      const next = new Map(prev);
+      next.set(recordId, value);
+      return next;
+    });
+  };
+
+  const handleBatchImportSubmit = async () => {
+    if (!task || batchEditData.size === 0) {
+      message.warning('请至少修改一个盘点数量');
+      return;
+    }
+
+    const items = Array.from(batchEditData.entries()).map(([recordId, countedQuantity]) => ({
+      recordId,
+      countedQuantity,
+    }));
+
+    try {
+      await countTaskApi.batchImport(task.id, { items });
+      message.success(`批量导入成功，共更新 ${items.length} 条记录`);
+      setBatchImportVisible(false);
+      setBatchEditData(new Map());
+      loadTaskDetail(task.id);
+    } catch (e: any) {
+      message.error(e.message);
+    }
+  };
+
+  const handleBackToList = () => {
+    navigate('/tasks');
+  };
+
+  const handleRefreshList = () => {
+    if (task) {
+      loadTaskDetail(task.id);
+    }
   };
 
   const canEdit = task && (task.taskStatus === 'DRAFT' || task.taskStatus === 'REVIEWING');
@@ -400,6 +473,14 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ isCreate }) => {
           }
           extra={
             <Space>
+              {canEdit && (
+                <Button
+                  icon={<ImportOutlined />}
+                  onClick={handleBatchImport}
+                >
+                  批量导入
+                </Button>
+              )}
               {canSubmit && (
                 <Button
                   type="primary"
@@ -503,6 +584,183 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ isCreate }) => {
             <Input.TextArea rows={4} placeholder="请输入复盘意见" />
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        title="批量导入盘点数据"
+        open={batchImportVisible}
+        onCancel={() => {
+          setBatchImportVisible(false);
+          setBatchEditData(new Map());
+        }}
+        onOk={handleBatchImportSubmit}
+        okText="确认导入"
+        cancelText="取消"
+        width={1200}
+        footer={
+          <Space>
+            <Button onClick={handleBackToList} icon={<ArrowLeftOutlined />}>
+              返回列表
+            </Button>
+            <Button onClick={handleRefreshList} icon={<ReloadOutlined />}>
+              刷新
+            </Button>
+            <Button
+              type="primary"
+              onClick={handleBatchImportSubmit}
+              disabled={batchEditData.size === 0}
+            >
+              确认导入 ({batchEditData.size} 条)
+            </Button>
+            <Button onClick={() => {
+              setBatchImportVisible(false);
+              setBatchEditData(new Map());
+            }}>
+              取消
+            </Button>
+          </Space>
+        }
+      >
+        <Card size="small" style={{ marginBottom: 16 }}>
+          <Form form={batchFilterForm} layout="inline">
+            <Form.Item name="category" label="商品分类">
+              <Select
+                placeholder="请选择分类"
+                allowClear
+                style={{ width: 150 }}
+              >
+                <Select.Option value="生鲜">生鲜</Select.Option>
+                <Select.Option value="食品">食品</Select.Option>
+                <Select.Option value="日用">日用</Select.Option>
+                <Select.Option value="饮料">饮料</Select.Option>
+                <Select.Option value="数码">数码</Select.Option>
+              </Select>
+            </Form.Item>
+            <Form.Item name="keyword" label="关键词">
+              <Input
+                placeholder="SKU/商品名称"
+                style={{ width: 200 }}
+                allowClear
+              />
+            </Form.Item>
+            <Form.Item>
+              <Button
+                type="primary"
+                icon={<SearchOutlined />}
+                onClick={handleBatchFilter}
+              >
+                查询
+              </Button>
+            </Form.Item>
+            <Form.Item>
+              <Button onClick={() => {
+                batchFilterForm.resetFields();
+                loadBatchImportData();
+              }}>
+                重置
+              </Button>
+            </Form.Item>
+          </Form>
+        </Card>
+
+        <Table
+          rowKey="recordId"
+          columns={[
+            {
+              title: '商品SKU',
+              dataIndex: 'sku',
+              key: 'sku',
+              width: 120,
+            },
+            {
+              title: '商品名称',
+              dataIndex: 'productName',
+              key: 'productName',
+              width: 150,
+            },
+            {
+              title: '分类',
+              dataIndex: 'category',
+              key: 'category',
+              width: 80,
+            },
+            {
+              title: '单价',
+              dataIndex: 'unitPrice',
+              key: 'unitPrice',
+              width: 100,
+              render: (val) => `¥${val?.toFixed(2)}`,
+            },
+            {
+              title: '系统库存',
+              dataIndex: 'systemQuantity',
+              key: 'systemQuantity',
+              width: 100,
+            },
+            {
+              title: '盘点数量',
+              dataIndex: 'countedQuantity',
+              key: 'countedQuantity',
+              width: 180,
+              render: (val, record: InventoryWithProductVO) => {
+                const currentValue = batchEditData.get(record.recordId!) ?? val;
+                if (record.readOnly) {
+                  return (
+                    <Space>
+                      <span>{currentValue}</span>
+                      <Tag color="gray">只读</Tag>
+                    </Space>
+                  );
+                }
+                return (
+                  <InputNumber
+                    min={0}
+                    value={currentValue}
+                    onChange={(value) =>
+                      handleBatchQuantityChange(record.recordId!, value ?? 0)
+                    }
+                    size="small"
+                    style={{ width: 120 }}
+                  />
+                );
+              },
+            },
+            {
+              title: '差异数量',
+              dataIndex: 'diffQuantity',
+              key: 'diffQuantity',
+              width: 100,
+              render: (val, record: InventoryWithProductVO) => {
+                const counted = batchEditData.get(record.recordId!) ?? record.countedQuantity;
+                const diff = counted - record.systemQuantity;
+                return (
+                  <span className={diff > 0 ? 'diff-positive' : diff < 0 ? 'diff-negative' : ''}>
+                    {diff > 0 ? '+' : ''}{diff}
+                  </span>
+                );
+              },
+            },
+            {
+              title: '差异金额',
+              key: 'diffAmount',
+              width: 120,
+              render: (_, record: InventoryWithProductVO) => {
+                const counted = batchEditData.get(record.recordId!) ?? record.countedQuantity;
+                const diff = counted - record.systemQuantity;
+                const diffAmount = diff * record.unitPrice;
+                return (
+                  <span className={diffAmount > 0 ? 'diff-positive' : diffAmount < 0 ? 'diff-negative' : ''}>
+                    {diffAmount > 0 ? '+' : ''}¥{diffAmount.toFixed(2)}
+                  </span>
+                );
+              },
+            },
+          ]}
+          dataSource={batchImportData}
+          loading={batchImportLoading}
+          pagination={{ pageSize: 10 }}
+          scroll={{ y: 400 }}
+        />
       </Modal>
     </div>
   );

@@ -2,8 +2,10 @@ package com.inventory.controller;
 
 import com.inventory.common.Result;
 import com.inventory.dto.AdjustmentDTO;
+import com.inventory.dto.BatchImportDTO;
 import com.inventory.dto.CountTaskDetailVO;
 import com.inventory.dto.CreateCountTaskDTO;
+import com.inventory.dto.InventoryWithProductVO;
 import com.inventory.dto.ReviewDTO;
 import com.inventory.dto.UpdateCountRecordDTO;
 import com.inventory.entity.CountRecord;
@@ -76,6 +78,23 @@ public class CountTaskController {
     public Result<CountTask> adjustInventory(@Valid @RequestBody AdjustmentDTO dto) {
         return Result.success(countTaskService.adjustInventory(
                 dto.getTaskId(), dto.getOperator(), dto.getRemark()));
+    }
+
+    @GetMapping("/{taskId}/batch-import")
+    @Operation(summary = "获取批量导入数据", description = "根据筛选条件获取当前任务的商品库存盘点数据，用于批量导入")
+    public Result<List<InventoryWithProductVO>> getBatchImportData(
+            @PathVariable Long taskId,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String keyword) {
+        return Result.success(countTaskService.getInventoryForBatchImport(taskId, category, keyword));
+    }
+
+    @PostMapping("/{taskId}/batch-import")
+    @Operation(summary = "批量导入盘点数据", description = "批量更新多个商品的盘点数量，自动计算差异")
+    public Result<List<CountRecord>> batchImport(
+            @PathVariable Long taskId,
+            @Valid @RequestBody BatchImportDTO dto) {
+        return Result.success(countTaskService.batchImportCountRecords(taskId, dto.getItems()));
     }
 
     @PostMapping("/{taskId}/close")

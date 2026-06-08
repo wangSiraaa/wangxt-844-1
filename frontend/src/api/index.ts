@@ -1,5 +1,5 @@
 import apiClient from './client';
-import type { Store, Product, Inventory, CountTask, CountTaskDetailVO, TaskStatus, ReviewResult } from '../types';
+import type { Store, Product, Inventory, CountTask, CountTaskDetailVO, TaskStatus, ReviewResult, InventoryWithProductVO, CountRecord } from '../types';
 
 export const storeApi = {
   getAll: () => apiClient.get<any, Store[]>('/stores'),
@@ -32,4 +32,8 @@ export const countTaskApi = {
   adjust: (data: { taskId: number; operator: string; remark?: string }) =>
     apiClient.post<any, CountTask>('/count-tasks/adjust', data),
   close: (taskId: number) => apiClient.post<any, CountTask>(`/count-tasks/${taskId}/close`),
+  getBatchImportData: (taskId: number, params?: { category?: string; keyword?: string }) =>
+    apiClient.get<any, InventoryWithProductVO[]>(`/count-tasks/${taskId}/batch-import`, { params }),
+  batchImport: (taskId: number, data: { items: { recordId: number; countedQuantity: number }[] }) =>
+    apiClient.post<any, CountRecord[]>(`/count-tasks/${taskId}/batch-import`, data),
 };

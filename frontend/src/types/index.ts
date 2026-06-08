@@ -62,6 +62,23 @@ export interface CountTaskDetailVO {
   records: CountRecord[];
 }
 
+export interface InventoryWithProductVO {
+  id?: number;
+  storeId?: number;
+  productId: number;
+  sku: string;
+  productName: string;
+  category: string;
+  unitPrice: number;
+  unit: string;
+  systemQuantity: number;
+  countedQuantity: number;
+  diffQuantity: number;
+  diffAmount: number;
+  readOnly: boolean;
+  recordId?: number;
+}
+
 export type ReviewResult = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface Result<T> {

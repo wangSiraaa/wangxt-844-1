@@ -1,7 +1,9 @@
 package com.inventory.service;
 
+import com.inventory.dto.BatchImportItemDTO;
 import com.inventory.dto.CountTaskDetailVO;
 import com.inventory.dto.CreateCountTaskDTO;
+import com.inventory.dto.InventoryWithProductVO;
 import com.inventory.entity.*;
 import com.inventory.enums.ReviewResult;
 import com.inventory.enums.TaskStatus;
@@ -16,6 +18,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -210,6 +214,58 @@ public class CountTaskService {
 
         task.setTaskStatus(TaskStatus.ADJUSTED);
         return countTaskRepository.save(task);
+    }
+
+    public List<InventoryWithProductVO> getInventoryForBatchImport(Long taskId, String category, String keyword) {
+        CountTask task = countTaskRepository.findById(taskId)
+                .orElseThrow(() -> new IllegalArgumentException("盘点任务不存在: " + taskId));
+
+        List<CountRecord> records = countRecordRepository.findByTaskIdOrderById(taskId);
+        List<Product> filteredProducts = productRepository.findByFilters(category, keyword);
+
+        Map<Long, Product> productMap = filteredProducts.stream()
+                .collect(Collectors.toMap(Product::getId, p -> p));
+
+        return records.stream()
+                .filter(record -> productMap.containsKey(record.getProductId()))
+                .map(record -> new InventoryWithProductVO(record, productMap.get(record.getProductId())))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public List<CountRecord> batchImportCountRecords(Long taskId, List<BatchImportItemDTO> items) {
+        CountTask task = countTaskRepository.findByIdWithLock(taskId)
+                .orElseThrow(() -> new IllegalArgumentException("盘点任务不存在: " + taskId));
+
+        if (task.getTaskStatus() != TaskStatus.DRAFT && task.getTaskStatus() != TaskStatus.REVIEWING) {
+            throw new BusinessException("当前任务状态不允许批量导入盘点数据");
+        }
+
+        List<CountRecord> updatedRecords = new ArrayList<>();
+        for (BatchImportItemDTO item : items) {
+            CountRecord record = countRecordRepository.findById(item.getRecordId())
+                    .orElseThrow(() -> new IllegalArgumentException("盘点记录不存在: " + item.getRecordId()));
+
+            if (!record.getTaskId().equals(taskId)) {
+                throw new BusinessException("盘点记录不属于当前任务: " + item.getRecordId());
+            }
+
+            if (Boolean.TRUE.equals(record.getReadOnly())) {
+                throw new BusinessException("盘点记录已只读，无法修改: " + item.getRecordId());
+            }
+
+            int diffQuantity = item.getCountedQuantity() - record.getSystemQuantity();
+            BigDecimal diffAmount = BigDecimal.valueOf(diffQuantity).multiply(record.getUnitPrice());
+
+            record.setCountedQuantity(item.getCountedQuantity());
+            record.setDiffQuantity(diffQuantity);
+            record.setDiffAmount(diffAmount);
+
+            updatedRecords.add(countRecordRepository.save(record));
+        }
+
+        recalculateTotalDiffAmount(taskId);
+        return updatedRecords;
     }
 
     @Transactional
